@@ -7,7 +7,7 @@ import os
 import json
 import re
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="insert API key here")
 
 dataset = load_dataset("truthful_qa", "multiple_choice")
 questions = dataset['validation'].select(range(50))
