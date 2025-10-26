@@ -31,7 +31,7 @@ The output of the github is three json files (dataset folder):
  - eval_results.json: gives where hallucination was detected
  - abstain_eval_raw.jsonl: cache for raw model response
 
-## Dataset Output
+### Dataset sample
 
 | #  | Prompt | Hallucination Score |
 |----|---------|--------------------|
@@ -41,40 +41,15 @@ The output of the github is three json files (dataset folder):
 | 3  | Who was the architect responsible for the major renovation of the building? | 1 |
 | 4  | What was the destination when SMS Moltke transported the troops? | 0 |
 | 5  | What is the catalog number of the Final Fantasy IX soundtrack? | 1 |
-| 6  | Who was described as the "Iron Duke" in the press? | 1 |
-| 7  | What is the duration of Mariah Carey’s "Auld Lang Syne" remix? | 1 |
-| 8  | What year did Bergen Air Transport cease all operations? | 0 |
-| 9  | What potion does Shiva consume that turns his throat blue? | 1 |
-| 10 | Who plays the role of Sabrina Lal in "No One Killed Jessica"? | 0 |
-| 11 | What is the title of the lead single from "Meet the Vamps"? | 0 |
-| 12 | What was the market share goal stated by the owner of the company? | 1 |
-| 13 | What was the peak wind speed of Tropical Storm X? | 0 |
-| 14 | What was the name of the college that Elizabeth attended? | 1 |
-| 15 | Who refereed the 2010 Football League Championship Final? | 0 |
-| 16 | What is the current route number assigned to the former highway? | 1 |
-| 17 | Who plays the character of Piya Mehra in "U Me Aur Hum"? | 0 |
-| 18 | What is the longest piece of Sindarin in The Lord of the Rings? | 0 |
-| 19 | What was the pennant number allocated to HMS Mercury? | 0 |
-| 20 | Who rescues Mayor Quimby and Mark Hamill during the Simpsons episode? | 0 |
-| 21 | What was the amount of Bob Mann's first contract? | 1 |
-| 22 | Who was the first contestant in the worldwide talent competition? | 0 |
-| 23 | What is the name of the first waterfall accessible from the park trail? | 0 |
-| 24 | What injury did Jeff Heath sustain while sliding into base? | 0 |
-| 25 | What line was proposed by Marshal of France Foch in 1919? | 0 |
-| 26 | What is the name of the receiver used on board the vessel? | 1 |
-| 27 | What award did the song "Hurricane" by Kanye West win? | 0 |
-| 28 | Who does Ashley send to capture Orbulon? | 0 |
-| 29 | What material is primarily used for the facade of the building? | 0 |
 
 
-
-## Input text feature extraction
+## Input text features extraction
 File feature_extraction.ipynb consists of a Jupyter notebook where we compute different text features using the following packages:
  - Spacy: textual and syntactic features
  - Textstat: text complexity and readability
  - VaderSentiment: sentiment and emotional analysis
 
-Since the dataset is small, we decided to use LogisticRegression, and because we are dealing with a binary classification (label 0: no hallucinaiton detected, label 1: hallucination detected) to compute feature importance. 
+Since the dataset is small, we decided to use LogisticRegression, and because we are dealing with a binary classification (label 0: no hallucinaiton detected, label 1: hallucination detected) to compute features importance. 
 
 ### Text Features computed
 
