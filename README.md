@@ -95,7 +95,7 @@ Feature importance was computed using:
 Based on Hallulens github license section: "The majority of HalluLens is licensed under CC-BY-NC, however portions of the project are available under separate license terms: https://github.com/shmsw25/FActScore is licensed under the MIT license; VeriScore is licensed under the Apache 2.0 license."
 
 
-## Citation
+## Reference
 ```bibtex
 @article{bang2025hallulens,
   title={HalluLens: LLM Hallucination Benchmark},
