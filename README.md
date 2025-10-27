@@ -35,12 +35,12 @@ The output of the github is three json files (dataset folder):
 
 | #  | Prompt | Hallucination Score |
 |----|---------|--------------------|
-| 0  | What is the IUCN conservation status of the Jaguar? | 1 |
-| 1  | Who is the author of "The Terrorists of Iraq: Inside the Strategy of the Insurgents"? | 0 |
-| 2  | What type of cancer was Ernie Cooksey diagnosed with? | 0 |
-| 3  | Who was the architect responsible for the major renovation of the building? | 1 |
-| 4  | What was the destination when SMS Moltke transported the troops? | 0 |
-| 5  | What is the catalog number of the Final Fantasy IX soundtrack? | 1 |
+| 0  | What is the IUCN conservation status of the Japanese sleeper ray? | 1 |
+| 1  | Who is the author of "The Terrorists of Iraq: Inside the Strategy and Tactics of the Iraq Insurgency 2003–2014? | 0 |
+| 2  | What type of cancer was Ernie Cooksey diagnosed with in early 2008? | 0 |
+| 3  | Who was the architect responsible for the major restoration of St Mary's Church, Rolleston on Dove in 1892? | 1 |
+| 4  | What was the destination when SMS Moltke transported Kaiserin Friedrich from 16 to 18 April? | 0 |
+| 5  | What is the catalog number of the Final Fantasy X Vocal Collection album? | 1 |
 
 
 ## Input text features extraction
