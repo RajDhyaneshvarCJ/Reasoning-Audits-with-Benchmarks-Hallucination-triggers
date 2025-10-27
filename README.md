@@ -42,6 +42,8 @@ The output of the github is three json files (dataset folder):
 | 4  | What was the destination when SMS Moltke transported Kaiserin Friedrich from 16 to 18 April? | 0 |
 | 5  | What is the catalog number of the Final Fantasy X Vocal Collection album? | 1 |
 
+0: No hallucination detected
+1: Hallucination detected
 
 ## Input text features extraction
 File feature_extraction.ipynb consists of a Jupyter notebook where we compute different text features using the following packages:
