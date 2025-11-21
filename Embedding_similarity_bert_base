@@ -431,7 +431,7 @@ def test_visualizer():
     analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
     
     # Test with dataset processing
-    dataset_path = 'task1_merged.jsonl'
+    dataset_path = './dataset/task1_merged_generation.jsonl'
 
     results = analyzer.process_dataset(dataset_path)
     print(f"Total samples: {len(results)}")
