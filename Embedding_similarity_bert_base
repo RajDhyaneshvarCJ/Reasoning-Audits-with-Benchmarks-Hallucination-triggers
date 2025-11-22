@@ -440,7 +440,7 @@ def test_visualizer():
     analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
 
     # Test with CSV dataset processing
-    dataset_path = 'full_dataset.csv'
+    dataset_path = './dataset/full_dataset.csv'
 
     results = analyzer.process_dataset(dataset_path)
     print(f"Total samples: {len(results)}")
