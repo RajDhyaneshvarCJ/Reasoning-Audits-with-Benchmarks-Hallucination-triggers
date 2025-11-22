@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
 from collections import defaultdict
 import torch
 from transformers import AutoTokenizer, AutoModel
@@ -126,19 +127,56 @@ class ContextualEmbeddingSimilarity:
         # Get the number of words in the answer 
         return len(text.split())
 
-    def load_dataset(self, file_path):
-        # Load the JSONL dataset 
-        dataset = []
-        with open(file_path, 'r') as f:
+    def load_dataset(self, generations_file_path, labels_file_path):
+        # Load generation data as list
+        generations = []
+        with open(generations_file_path, 'r') as f:
             for line in f:
                 if line.strip():
-                    dataset.append(json.loads(line))
+                    generations.append(json.loads(line))
+        
+        # Load hallucination labels as list
+        labels = []
+        with open(labels_file_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    labels.append(json.loads(line))
+        
+        # Align generations and labels by position (sequence)
+        dataset = []
+        min_length = min(len(generations), len(labels))
+        
+        for i in range(min_length):
+            gen_data = generations[i]
+            label_data = labels[i]
+            
+            run_id = gen_data['run_id']
+            generation = gen_data['generation']
+            is_hallucinated = label_data['halu_test_res']
+            
+            dataset.append({
+                'run_id': run_id,
+                'generation': generation,
+                'is_hallucinated': is_hallucinated
+            })
+        
+        print(f"Loaded {len(generations)} generations and {len(labels)} labels")
+        
+        # Show sequence validation
+        mismatched_run_ids = 0
+        for i in range(min_length):
+            if generations[i]['run_id'] != labels[i]['run_id']:
+                mismatched_run_ids += 1
+        
+        if mismatched_run_ids > 0:
+            print(f"Warning: num of generation and label don't match")
+        
         return dataset
 
-    def process_dataset(self, dataset_path, num_layers=4):
+    def process_dataset(self, generations_file_path, labels_file_path, num_layers=4):
         # Process the dataset and generate graphs
-        dataset = self.load_dataset(dataset_path)
-        # dataset = dataset[:100]
+        dataset = self.load_dataset(generations_file_path, labels_file_path)
+        # dataset = dataset[:150]
         # results
         results = []
         
@@ -153,6 +191,7 @@ class ContextualEmbeddingSimilarity:
             answer_length = self.get_answer_length(generation)
             
             results.append({
+                'run_id': sample['run_id'],
                 'generation': generation,
                 'is_hallucinated': is_hallucinated,
                 'avg_similarity': avg_similarity,
@@ -430,10 +469,11 @@ class ContextualEmbeddingSimilarity:
 def test_visualizer():
     analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
     
-    # Test with dataset processing
-    dataset_path = './dataset/task1_merged_generation.jsonl'
+    # Test with dataset processing using separate files for generations and labels
+    generations_file = './dataset/task1_merged_generation.jsonl'
+    labels_file = './dataset/task1_merged_hallucination_scores.jsonl'
 
-    results = analyzer.process_dataset(dataset_path)
+    results = analyzer.process_dataset(generations_file, labels_file)
     print(f"Total samples: {len(results)}")
     
     # Print some basic statistics
