@@ -3,12 +3,12 @@
 # python -m spacy download en_core_web_sm
 import numpy as np
 import matplotlib.pyplot as plt
-
 from collections import defaultdict
 import torch
 from transformers import AutoTokenizer, AutoModel
 import spacy
 import json
+import pandas as pd
 
 class ContextualEmbeddingSimilarity:
     # Class for producing semantic similarity graphs
@@ -112,8 +112,6 @@ class ContextualEmbeddingSimilarity:
 
         return None
 
-
-
     def calculate_average_similarity(self, text, num_layers=4):
         # Calculate the average similarity score for a text
         word_embeddings = self.get_contextual_word_embeddings(text, num_layers=num_layers)
@@ -130,56 +128,19 @@ class ContextualEmbeddingSimilarity:
         # Get the number of words in the answer 
         return len(text.split())
 
-    def load_dataset(self, generations_file_path, labels_file_path):
-        # Load generation data as list
-        generations = []
-        with open(generations_file_path, 'r') as f:
-            for line in f:
-                if line.strip():
-                    generations.append(json.loads(line))
-        
-        # Load hallucination labels as list
-        labels = []
-        with open(labels_file_path, 'r') as f:
-            for line in f:
-                if line.strip():
-                    labels.append(json.loads(line))
-        
-        # Align generations and labels by position (sequence)
-        dataset = []
-        min_length = min(len(generations), len(labels))
-        
-        for i in range(min_length):
-            gen_data = generations[i]
-            label_data = labels[i]
-            
-            run_id = gen_data['run_id']
-            generation = gen_data['generation']
-            is_hallucinated = label_data['halu_test_res']
-            
-            dataset.append({
-                'run_id': run_id,
-                'generation': generation,
-                'is_hallucinated': is_hallucinated
-            })
-        
-        print(f"Loaded {len(generations)} generations and {len(labels)} labels")
-        
-        # Show sequence validation
-        mismatched_run_ids = 0
-        for i in range(min_length):
-            if generations[i]['run_id'] != labels[i]['run_id']:
-                mismatched_run_ids += 1
-        
-        if mismatched_run_ids > 0:
-            print(f"Warning: num of generation and label don't match")
-        
+    def load_dataset(self, file_path):
+        # Load the CSV dataset
+        df = pd.read_csv(file_path)
+        # Convert 'True'/'False' strings to boolean values
+        df['halu_test_res'] = df['halu_test_res'].map({'True': True, 'False': False})
+        # Convert DataFrame to list of dictionaries
+        dataset = df.to_dict('records')
         return dataset
 
-    def process_dataset(self, generations_file_path, labels_file_path, num_layers=4):
+    def process_dataset(self, dataset_path, num_layers=4):
         # Process the dataset and generate graphs
-        dataset = self.load_dataset(generations_file_path, labels_file_path)
-        # dataset = dataset[:150]
+        dataset = self.load_dataset(dataset_path)
+        dataset = dataset[:250]
         # results
         results = []
         
@@ -187,14 +148,13 @@ class ContextualEmbeddingSimilarity:
         
         for i, sample in enumerate(dataset):
             generation = sample['generation']
-            is_hallucinated = sample['is_hallucinated']
+            is_hallucinated = sample['halu_test_res']
             
             # Calculate average similarity and answer length
             avg_similarity = self.calculate_average_similarity(generation, num_layers)
             answer_length = self.get_answer_length(generation)
             
             results.append({
-                'run_id': sample['run_id'],
                 'generation': generation,
                 'is_hallucinated': is_hallucinated,
                 'avg_similarity': avg_similarity,
@@ -465,18 +425,14 @@ class ContextualEmbeddingSimilarity:
         plt.tight_layout()
         plt.show()
 
-
-
-
 # Simple testing function
 def test_visualizer():
     analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
     
-    # Test with dataset processing using separate files for generations and labels
-    generations_file = './dataset/task1_merged_generation.jsonl'
-    labels_file = './dataset/task1_merged_hallucination_scores.jsonl'
+    # Test with dataset processing
+    dataset_path = 'dataset/full_dataset.csv'
 
-    results = analyzer.process_dataset(generations_file, labels_file)
+    results = analyzer.process_dataset(dataset_path)
     print(f"Total samples: {len(results)}")
     
     # Print some basic statistics
