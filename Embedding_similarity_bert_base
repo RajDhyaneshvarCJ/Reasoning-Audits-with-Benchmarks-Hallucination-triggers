@@ -10,7 +10,6 @@ import spacy
 import pandas as pd
 import warnings
 
-# Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings('ignore', message='.*datetime.utcnow.*')
@@ -118,8 +117,6 @@ class ContextualEmbeddingSimilarity:
 
         return None
 
-
-
     def calculate_average_similarity(self, text, num_layers=4):
         # Calculate the average similarity score for a text
         word_embeddings = self.get_contextual_word_embeddings(text, num_layers=num_layers)
@@ -155,9 +152,6 @@ class ContextualEmbeddingSimilarity:
         for i, sample in enumerate(dataset):
             generation = sample['generation']
             
-            # IMPORTANT: Handle the boolean correctly
-            # halu_test_res True = no hallucination, False = hallucination
-            # We invert because is_hallucinated should be True for hallucinated samples
             is_hallucinated = not sample['halu_test_res']
 
             # Calculate average similarity and answer length
@@ -208,8 +202,6 @@ class ContextualEmbeddingSimilarity:
             return 0.0
 
         return dot_product / (norm_a * norm_b)
-
-
 
     def _create_hallucination_visualizations(self, results):
         # Filter out samples with insufficient word embeddings
@@ -440,6 +432,8 @@ def test_visualizer():
     analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
 
     # Test with CSV dataset processing
+    # Hallucinated samples: 2561
+    # Non-hallucinated samples: 1525
     dataset_path = './dataset/full_dataset.csv'
 
     results = analyzer.process_dataset(dataset_path)
