@@ -55,28 +55,38 @@ Since the dataset is small, we decided to use LogisticRegression, and because we
 
 ### Text Features computed
 
-| **Category**               | **Feature Name**     | **Description**                                              |
-| -------------------------- | -------------------- | ------------------------------------------------------------ |
-| **Linguistic (spaCy)**     | `number sentence`    | Number of sentences in the text                              |
-|                            | `lemma ratio`        | Ratio of unique lemmas to total tokens (vocabulary richness) |
-|                            | `noun ratio`         | Proportion of nouns among all tokens                         |
-|                            | `verb ratio`         | Proportion of verbs among all tokens                         |
-|                            | `adjective ratio`    | Proportion of adjectives among all tokens                    |
-|                            | `adverb ratio`       | Proportion of adverbs among all tokens                       |
-|                            | `auxiliairis ratio`  | Proportion of auxiliary verbs among all tokens               |
-|                            | `stop ratio`         | Ratio of stop words in the text                              |
-|                            | `punctuation ratio`  | Ratio of punctuation marks in the text                       |
-|                            | `entity ratio`       | Ratio of named entities in the text                          |
-| **Readability (textstat)** | `flesch score`       | Flesch Reading Ease score (higher = easier to read)          |
-|                            | `grade (US School)`  | Estimated U.S. school grade level of the text                |
-|                            | `complexity`         | Gunning Fog Index (higher = more complex text)               |
-|                            | `Number rare words`  | Number of difficult or uncommon words                        |
-|                            | `Dale-Chall Score`   | Dale–Chall readability score                                 |
-| **Sentiment (VADER)**      | `negative sentiment` | Intensity of negative sentiment                              |
-|                            | `neutral sentiment`  | Intensity of neutral sentiment                               |
-|                            | `positive sentiment` | Intensity of positive sentiment                              |
-|                            | `overall sentiment`  | Compound sentiment score (overall polarity)                  |
-
+| **Category**               | **Feature Name**         | **Description**                                                      |
+| -------------------------- | ------------------------- | -------------------------------------------------------------------- |
+| **Linguistic (spaCy)**     | `number_sentence`         | Number of sentences in the text                                      |
+|                            | `lemma_ratio`             | Ratio of unique lemmas to total tokens (vocabulary richness)        |
+|                            | `noun_ratio`              | Proportion of nouns among all tokens                                |
+|                            | `verb_ratio`              | Proportion of verbs among all tokens                                |
+|                            | `adjective_ratio`         | Proportion of adjectives among all tokens                           |
+|                            | `adverb_ratio`            | Proportion of adverbs among all tokens                              |
+|                            | `auxiliary_ratio`         | Proportion of auxiliary verbs among all tokens                      |
+|                            | `stop_ratio`              | Ratio of stop words among all tokens                                |
+|                            | `punctuation_ratio`       | Ratio of punctuation marks among all tokens                         |
+|                            | `entity_ratio`            | Ratio of named entities among all tokens                            |
+|                            | `num_tokens`              | Total number of non-space tokens                                    |
+|                            | `avg_sentence_length`     | Average number of non-space tokens per sentence                     |
+|                            | `max_sentence_length`     | Maximum number of non-space tokens in a single sentence             |
+|                            | `char_length`             | Total number of characters in the text                              |
+|                            | `num_entities`            | Total number of named entities detected                             |
+|                            | `person_ratio`            | Proportion of PERSON entities among all tokens                      |
+|                            | `org_ratio`               | Proportion of ORG entities among all tokens                         |
+|                            | `gpe_ratio`               | Proportion of GPE (countries/cities) entities among all tokens      |
+|                            | `date_ratio`              | Proportion of DATE entities among all tokens                        |
+|                            | `num_numbers`             | Number of numeric tokens (`like_num=True`)                          |
+|                            | `number_ratio`            | Proportion of numeric tokens among all tokens                       |
+| **Readability (textstat)** | `flesch_score`            | Flesch Reading Ease score (higher = easier to read)                 |
+|                            | `grade_us`                | Estimated U.S. school grade level                                   |
+|                            | `complexity`              | Gunning Fog Index (higher = more complex text)                      |
+|                            | `num_rare_words`          | Number of difficult or uncommon words                               |
+|                            | `dale_chall_score`        | Dale–Chall Readability Score                                        |
+| **Sentiment (VADER)**      | `negative_sentiment`      | Intensity of negative sentiment                                     |
+|                            | `neutral_sentiment`       | Intensity of neutral sentiment                                      |
+|                            | `positive_sentiment`      | Intensity of positive sentiment                                     |
+|                            | `overall_sentiment`       | Compound polarity sentiment score                                   |
 
 
 ### Features importance computation
