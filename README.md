@@ -1,4 +1,4 @@
-# Project: Reasoning Audits with Benchmarks
+# Project: Reasoning Audits with Benchmarks 1
 
 ### Team: Amine Turki, Daniel Wei Li, Mingxuan Tang, Raj Dhyaneshvar Chennai Jayamoorthy
 ### Professors: Edmon Begoli, Gomathi Lakshmanan
@@ -24,23 +24,31 @@ The code goes first through each prompt in truthfulQA dataset, specifically the 
  We feed these features into random forest and compute feature importance. 
 
 ## Dataset
-The dataset was computed using the [HalluLens GitHub repository](https://github.com/facebookresearch/HalluLens). Task 1 (Precise WikiQA called) was run with N=30. The github requires a huge amount of tokens (1,034,443 tokens used). Since we were always hitting OpenaAi API usage limit, we could only generate 30 questions. We are planning to increase the dataset to 1000 questions for milestone 2. We used gpt-4 to generate questions and awnsers, and gpt-5 to judge 
+The dataset was computed using the [HalluLens GitHub repository](https://github.com/facebookresearch/HalluLens).  o4-mini was used to generate question-answer pairs using task 1 and task 3 in [HalluLens GitHub](https://github.com/facebookresearch/HalluLens). GPT-5 was utilized to detect hallucination. Task 1 focuses on evaluating the ability of the model to answer precise facts from Wikipedia without hallucinating. Task 3 evaluates the ability to recognize non-existent entities. 
 
-The output of the github is three json files (dataset folder):
- - generation.jsonl: questions generated
- - eval_results.json: gives where hallucination was detected
- - abstain_eval_raw.jsonl: cache for raw model response
+The generated data is in 4 json files (dataset/hallulens_data folder):
+ - task1_merged_generation.jsonl: question-answer generated using task 1
+ - task1_merged_hallucination_scores.jsonl: gives where hallucination was detected with task 1
+ - task3_merged_generation.jsonl: question-answer generated using task 3
+ - task3_merged_hallucination_scores.jsonl: gives where hallucination was detected with task 3
 
 ### Dataset sample
 
-| #  | Prompt | Hallucination Score |
-|----|---------|--------------------|
-| 0  | What is the IUCN conservation status of the Japanese sleeper ray? | 1 |
-| 1  | Who is the author of "The Terrorists of Iraq: Inside the Strategy and Tactics of the Iraq Insurgency 2003–2014? | 0 |
-| 2  | What type of cancer was Ernie Cooksey diagnosed with in early 2008? | 0 |
-| 3  | Who was the architect responsible for the major restoration of St Mary's Church, Rolleston on Dove in 1892? | 1 |
-| 4  | What was the destination when SMS Moltke transported Kaiserin Friedrich from 16 to 18 April? | 0 |
-| 5  | What is the catalog number of the Final Fantasy X Vocal Collection album? | 1 |
+### Dataset Preview (4000 rows × 3 columns)
+
+| Index | prompt | halu_test_res | cot_steps |
+|-------|--------|----------------|-----------|
+| 0 | What position did Jan Willem Spruyt hold in the ... | 1 | 1. I recognized that the prompt is asking for ... |
+| 1 | What was the new name given to First Prize by ... | 0 | 1. **Identifying the Key Terms**: I recognized... |
+| 2 | What is the northern terminus of Mississippi H... | 1 | 1. **Identification of the Highway**: I recogn... |
+| 3 | Who is betrothed to St. Elmo in the film? | 1 | 1. **Identify the Subject**: I recognized that... |
+| 4 | What date was the album Oddfellows released? | 0 | 1. I recognized that the prompt is asking for ... |
+| ... | ... | ... | ... |
+| 3995 | I'd like to learn more about the plant Thelypo... | 1 | 1. **Identify the Subject:** The prompt reques... |
+| 3996 | Could you provide an overview of the plant Bar... | 1 | 1. **Identify the Plant**: The model recognize... |
+| 3997 | I want to know more about the plant Brunfelsia... | 1 | 1. **Identifying the Plant**: I recognized tha... |
+| 3998 | What can you tell me about the plant Munroa gl... | 1 | 1. **Identification of the Species**: I recogn... |
+| 3999 | Can you describe the plant Microlejeunea augieri? | 1 | 1. **Identifying the Subject**: I recognized t... |
 
  - 0: No hallucination detected
  - 1: Hallucination detected
@@ -50,58 +58,60 @@ File feature_extraction.ipynb consists of a Jupyter notebook where we compute di
  - Spacy: textual and syntactic features
  - Textstat: text complexity and readability
  - VaderSentiment: sentiment and emotional analysis
+ - Embedding
 
 Since the dataset is small, we decided to use LogisticRegression, and because we are dealing with a binary classification (label 0: no hallucinaiton detected, label 1: hallucination detected) to compute features importance. 
 
 ### Text Features computed
 
-| **Category**               | **Feature Name**         | **Description**                                                      |
-| -------------------------- | ------------------------- | -------------------------------------------------------------------- |
-| **Linguistic (spaCy)**     | `number_sentence`         | Number of sentences in the text                                      |
-|                            | `lemma_ratio`             | Ratio of unique lemmas to total tokens (vocabulary richness)        |
-|                            | `noun_ratio`              | Proportion of nouns among all tokens                                |
-|                            | `verb_ratio`              | Proportion of verbs among all tokens                                |
-|                            | `adjective_ratio`         | Proportion of adjectives among all tokens                           |
-|                            | `adverb_ratio`            | Proportion of adverbs among all tokens                              |
-|                            | `auxiliary_ratio`         | Proportion of auxiliary verbs among all tokens                      |
-|                            | `stop_ratio`              | Ratio of stop words among all tokens                                |
-|                            | `punctuation_ratio`       | Ratio of punctuation marks among all tokens                         |
-|                            | `entity_ratio`            | Ratio of named entities among all tokens                            |
-|                            | `num_tokens`              | Total number of non-space tokens                                    |
-|                            | `avg_sentence_length`     | Average number of non-space tokens per sentence                     |
-|                            | `max_sentence_length`     | Maximum number of non-space tokens in a single sentence             |
-|                            | `char_length`             | Total number of characters in the text                              |
-|                            | `num_entities`            | Total number of named entities detected                             |
-|                            | `person_ratio`            | Proportion of PERSON entities among all tokens                      |
-|                            | `org_ratio`               | Proportion of ORG entities among all tokens                         |
-|                            | `gpe_ratio`               | Proportion of GPE (countries/cities) entities among all tokens      |
-|                            | `date_ratio`              | Proportion of DATE entities among all tokens                        |
-|                            | `num_numbers`             | Number of numeric tokens (`like_num=True`)                          |
-|                            | `number_ratio`            | Proportion of numeric tokens among all tokens                       |
-| **Readability (textstat)** | `flesch_score`            | Flesch Reading Ease score (higher = easier to read)                 |
-|                            | `grade_us`                | Estimated U.S. school grade level                                   |
-|                            | `complexity`              | Gunning Fog Index (higher = more complex text)                      |
-|                            | `num_rare_words`          | Number of difficult or uncommon words                               |
-|                            | `dale_chall_score`        | Dale–Chall Readability Score                                        |
-| **Sentiment (VADER)**      | `negative_sentiment`      | Intensity of negative sentiment                                     |
-|                            | `neutral_sentiment`       | Intensity of neutral sentiment                                      |
-|                            | `positive_sentiment`      | Intensity of positive sentiment                                     |
-|                            | `overall_sentiment`       | Compound polarity sentiment score                                   |
+
+| **Category** | **Variable Name** | **Brief Description** |
+|--------------|-------------------|------------------------|
+| **Basic Counts** | `number sentence` | Number of sentences in the text. |
+| | `num_tokens` | Count of tokens excluding spaces. |
+| | `char_length` | Total character length of the text. |
+| | `num_entities` | Total number of named entities detected. |
+| | `num_numbers` | Count of numeric tokens. |
+| **Vocabulary & Structure** | `lemma ratio` | Ratio of unique lemmas to total tokens (vocabulary richness). |
+| | `avg_sentence_length` | Average number of tokens per sentence. |
+| | `max_sentence_length` | Maximum length among all sentences. |
+| **POS Ratios** | `noun_ratio` | Proportion of tokens that are NOUN. |
+| | `verb_ratio` | Proportion of tokens that are VERB. |
+| | `adjective_ratio` | Proportion of tokens that are ADJ. |
+| | `adverb_ratio` | Proportion of tokens that are ADV. |
+| | `auxiliairis_ratio` | Ratio of auxiliary verbs (AUX). |
+| **Token Category Ratios** | `stop_ratio` | Ratio of stopwords in the text. |
+| | `punctuation_ratio` | Ratio of punctuation tokens. |
+| | `number_ratio` | Ratio of numeric tokens. |
+| **Named Entity Ratios** | `entity_ratio` | Ratio of named entities to total tokens. |
+| | `person_ratio` | Ratio of "PERSON" entities to total tokens. |
+| | `org_ratio` | Ratio of "ORG" entities to total tokens. |
+| | `gpe_ratio` | Ratio of "GPE" entities to total tokens. |
+| | `date_ratio` | Ratio of "DATE" entities to total tokens. |
+| **Readability (textstat)** | `flesch score` | Flesch Reading Ease score. |
+| | `grade (US School)` | US school grade readability level. |
+| | `complexity` | Gunning Fog complexity index. |
+| | `Number rare words` | Count of difficult/rare words. |
+| | `Dale-Chall Score` | Dale–Chall readability score. |
+| **Sentiment (VADER)** | `negative sentiment` | Sentiment intensity for negative tone. |
+| | `neutral sentiment` | Sentiment intensity for neutral tone. |
+| | `positive sentiment` | Sentiment intensity for positive tone. |
+| | `overall sentiment` | Compound sentiment polarity score. |
+| **Embedding-Based Similarity** | `cosine similarity prompt-CoT` | Cosine similarity between prompt embedding and CoT embedding. |
+| | `ce_stsb_roberta prompt-cot` | Cross-encoder semantic similarity using STSB-RoBERTa-Large. |
+| | `bleurt` | BLEURT semantic similarity score between prompt and CoT. |
+
 
 
 ### Features importance computation
 Feature importance was computed using:
- - Logistic regression coefficients
+ - Logistic regression 
  - Matrix correlation
  - Mutual information
-
-![Logistic Regression coefficient](image/feature_importance_logisticregression.png)
-
-
-![Corrolation between text feautures and hallucination](image/feature_correlation.png)
-
-
-![Mutual Information between text feautures and hallucination](image/mutual_information.png)
+ - Random Forest
+ - XGBoost
+ - SVM with RBF Kernel
+ - MLP Classifier
 
 ## License
 Based on Hallulens github license section: "The majority of HalluLens is licensed under CC-BY-NC, however portions of the project are available under separate license terms: https://github.com/shmsw25/FActScore is licensed under the MIT license; VeriScore is licensed under the Apache 2.0 license."
@@ -206,4 +216,65 @@ Based on Hallulens github license section: "The majority of HalluLens is license
   pages={5--32},
   year={2001},
   publisher={Springer}
+}
+
+@inproceedings{reimers2019sentencebert,
+  title={Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks},
+  author={Nils Reimers and Iryna Gurevych},
+  booktitle={Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing},
+  year={2019},
+  url={https://arxiv.org/abs/1908.10084}
+}
+
+@inproceedings{reimers2020crossencoder,
+  title={Making Monolingual Sentence Embeddings Multilingual using Knowledge Distillation},
+  author={Nils Reimers and Iryna Gurevych},
+  booktitle={Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing},
+  year={2020},
+  note={Used for STSB-RoBERTa CrossEncoder},
+  url={https://arxiv.org/abs/2004.09813}
+}
+
+@article{sellam2020bleurt,
+  title={BLEURT: Learning Robust Metrics for Text Generation},
+  author={Thibault Sellam and Dipanjan Das and Ankur P. Parikh},
+  journal={Transactions of the Association for Computational Linguistics},
+  year={2020},
+  url={https://arxiv.org/abs/2004.04696}
+}
+
+@article{pedregosa2011scikit,
+  title={Scikit-learn: Machine Learning in Python},
+  author={Pedregosa, Fabian and others},
+  journal={Journal of Machine Learning Research},
+  volume={12},
+  pages={2825--2830},
+  year={2011},
+  url={https://scikit-learn.org/}
+}
+
+@inproceedings{chen2016xgboost,
+  title={XGBoost: A Scalable Tree Boosting System},
+  author={Tianqi Chen and Carlos Guestrin},
+  booktitle={Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  year={2016},
+  url={https://dl.acm.org/doi/10.1145/2939672.2939785}
+}
+
+@article{cover1991information,
+  title={Elements of Information Theory},
+  author={Thomas M. Cover and Joy A. Thomas},
+  year={1991},
+  note={Standard reference for Mutual Information},
+  publisher={Wiley},
+  url={https://onlinelibrary.wiley.com/doi/book/10.1002/047174882X}
+}
+
+@article{pearson1895correlation,
+  title={Note on Regression and Inheritance in the Case of Two Parents},
+  author={Karl Pearson},
+  journal={Proceedings of the Royal Society of London},
+  year={1895},
+  note={Classic reference for correlation coefficient},
+  url={https://royalsocietypublishing.org/doi/10.1098/rspl.1895.0041}
 }
