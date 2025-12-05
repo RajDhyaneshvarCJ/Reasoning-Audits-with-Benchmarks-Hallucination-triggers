@@ -1,0 +1,458 @@
+# run following installs
+# pip install spacy
+# python -m spacy download en_core_web_sm
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
+import torch
+from transformers import AutoTokenizer, AutoModel
+import spacy
+import pandas as pd
+import warnings
+
+warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings('ignore', message='.*datetime.utcnow.*')
+warnings.filterwarnings('ignore', message='.*findfont.*')
+
+class ContextualEmbeddingSimilarity:
+    # Class for producing semantic similarity graphs
+
+    def __init__(self, model_name='bert-base-uncased'):
+        try:
+            # transformer model for contextual embeddings
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.model = AutoModel.from_pretrained(model_name)
+            self.model.eval()
+
+            # spaCy for accurate POS tagging
+            self.nlp = spacy.load('en_core_web_sm')
+
+        except Exception as e:
+            raise OSError(f"Error loading models: {e}")
+
+    def get_contextual_word_embeddings(self, text, num_layers=4):
+        # Get contextual embeddings using BERT with spaCy POS tagging
+
+        # Get POS tagging from spaCy
+        doc = self.nlp(text)
+
+        # Tokenize with BERT
+        inputs = self.tokenizer(text, return_tensors='pt', return_offsets_mapping=True)
+        offset_mapping = inputs['offset_mapping'][0]
+
+        # Remove offset_mapping from model inputs
+        model_inputs = {k: v for k, v in inputs.items() if k != 'offset_mapping'}
+
+        with torch.no_grad():
+            # Get outputs from ALL layers, not just the last one
+            outputs = self.model(**model_inputs, output_hidden_states=True)
+            all_hidden_states = outputs.hidden_states
+
+        # Use the last num_layers
+        num_total_layers = len(all_hidden_states)
+        selected_layers = all_hidden_states[-num_layers:]
+
+        # Average the selected layers
+        averaged_embeddings = torch.mean(torch.stack(selected_layers), dim=0)[0]
+
+        # averaged embeddings
+        embeddings = averaged_embeddings
+        tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+
+        # Align spaCy tokens with BERT embeddings
+        word_embeddings = self._align_spacy_with_bert(doc, tokens, embeddings, offset_mapping)
+
+        return word_embeddings
+
+    def _align_spacy_with_bert(self, spacy_doc, bert_tokens, bert_embeddings, bert_offsets):
+        # Align spaCy tokens with BERT embeddings
+        word_embeddings = []
+
+        for spacy_token in spacy_doc:
+            # Only consider content words
+            if (spacy_token.pos_ in ['NOUN', 'VERB', 'ADJ', 'ADV', 'PROPN'] and
+                not spacy_token.is_stop and not spacy_token.is_punct and not spacy_token.is_space):
+
+                # Find corresponding BERT tokens for this spaCy token
+                token_embedding = self._get_bert_embedding_for_spacy_token(
+                    spacy_token, bert_tokens, bert_embeddings, bert_offsets
+                )
+
+                if token_embedding is not None:
+                    word_embeddings.append({
+                        'text': spacy_token.text,
+                        'vector': token_embedding,
+                        'pos': spacy_token.pos_,
+                        'context': f"{spacy_token.text}({spacy_token.pos_})",
+                    })
+
+        return word_embeddings
+
+    def _get_bert_embedding_for_spacy_token(self, spacy_token, bert_tokens, bert_embeddings, bert_offsets):
+        # Get BERT embedding for a spaCy token by matching character offsets
+        spacy_start = spacy_token.idx
+        spacy_end = spacy_token.idx + len(spacy_token.text)
+
+        matching_embeddings = []
+
+        for i, (token, offset, embedding) in enumerate(zip(bert_tokens, bert_offsets, bert_embeddings)):
+            bert_start, bert_end = offset
+
+            # Skip special tokens
+            if token in ['[CLS]', '[SEP]', '[PAD]']:
+                continue
+
+            # Check if this BERT token overlaps with the spaCy token
+            if (bert_start >= spacy_start and bert_end <= spacy_end) or \
+               (bert_start <= spacy_start and bert_end >= spacy_end) or \
+               (bert_start < spacy_end and bert_end > spacy_start):
+
+                matching_embeddings.append(embedding)
+
+        if matching_embeddings:
+            # Average all BERT subword embeddings for this spaCy token
+            avg_embedding = torch.mean(torch.stack(matching_embeddings), dim=0).numpy()
+            return avg_embedding
+
+        return None
+
+    def calculate_average_similarity(self, text, num_layers=4):
+        # Calculate the average similarity score for a text
+        word_embeddings = self.get_contextual_word_embeddings(text, num_layers=num_layers)
+
+        if len(word_embeddings) < 2:
+            return 0.0
+
+        similarity_matrix, _ = self._calculate_similarity_matrix(word_embeddings)
+        upper_triangle = similarity_matrix[np.triu_indices_from(similarity_matrix, k=1)]
+
+        return np.mean(upper_triangle) if len(upper_triangle) > 0 else 0.0
+
+    def get_answer_length(self, text):
+        # Get the number of words in the answer
+        return len(text.split())
+
+    def load_dataset(self, file_path):
+        """Load the CSV dataset with columns: prompt, generation, halu_test_res"""
+        df = pd.read_csv(file_path)
+        # Convert DataFrame to list of dictionaries
+        dataset = df.to_dict('records')
+        return dataset
+
+    def process_dataset(self, dataset_path, num_layers=4):
+        # Process the dataset and generate graphs
+        dataset = self.load_dataset(dataset_path)
+        # dataset = dataset[:200] 
+        # results
+        results = []
+
+        print(f"total samples: {len(dataset)}")
+
+        for i, sample in enumerate(dataset):
+            generation = sample['generation']
+            
+            is_hallucinated = not sample['halu_test_res']
+
+            # Calculate average similarity and answer length
+            avg_similarity = self.calculate_average_similarity(generation, num_layers)
+            answer_length = self.get_answer_length(generation)
+
+            results.append({
+                'generation': generation,
+                'is_hallucinated': is_hallucinated,
+                'avg_similarity': avg_similarity,
+                'answer_length': answer_length,
+                'word_embeddings': self.get_contextual_word_embeddings(generation, num_layers)
+            })
+
+            if (i + 1) % 10 == 0:
+                print(f"Processed {i + 1}/{len(dataset)} samples")
+
+        print(f"Finished processing {len(dataset)} samples")
+
+        # Generate visualizations
+        self._create_hallucination_visualizations(results)
+
+        return results
+
+    def _calculate_similarity_matrix(self, words):
+        # Calculate similarity matrix between word vectors
+        n = len(words)
+        similarity_matrix = np.zeros((n, n))
+        labels = [word['context'] for word in words]
+
+        for i in range(n):
+            for j in range(n):
+                if i != j:
+                    sim = self.cosine_similarity(words[i]['vector'], words[j]['vector'])
+                    similarity_matrix[i, j] = sim
+                else:
+                    similarity_matrix[i, j] = 1.0
+
+        return similarity_matrix, labels
+
+    def cosine_similarity(self, vec_a, vec_b):
+        # Calculate cosine similarity between two vectors
+        dot_product = np.dot(vec_a, vec_b)
+        norm_a = np.linalg.norm(vec_a)
+        norm_b = np.linalg.norm(vec_b)
+
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+
+        return dot_product / (norm_a * norm_b)
+
+    def _create_hallucination_visualizations(self, results):
+        # Filter out samples with insufficient word embeddings
+        valid_results = [r for r in results if r['word_embeddings'] and len(r['word_embeddings']) >= 2]
+
+        if not valid_results:
+            print("No valid samples for visualization")
+            return
+
+        # 1. Answer Length vs Average Similarity Dot Plot (with POS-specific analysis)
+        self._create_length_similarity_plot(valid_results)
+
+        # 2. POS Combinations by Hallucination Status
+        self._create_pos_hallucination_plot(valid_results)
+
+    def _create_length_similarity_plot(self, results):
+        # Create dot plot: Answer Length vs Average Similarity
+        plt.figure(figsize=(12, 8))
+
+        # Separate hallucinated and non-hallucinated
+        hallucinated = [r for r in results if r['is_hallucinated']]
+        non_hallucinated = [r for r in results if not r['is_hallucinated']]
+
+        # Create scatter plot
+        if non_hallucinated:
+            plt.scatter([r['answer_length'] for r in non_hallucinated],
+                       [r['avg_similarity'] for r in non_hallucinated],
+                       c='blue', alpha=0.6, s=50, label='Non-Hallucinated', edgecolors='darkblue')
+
+        if hallucinated:
+            plt.scatter([r['answer_length'] for r in hallucinated],
+                       [r['avg_similarity'] for r in hallucinated],
+                       c='red', alpha=0.6, s=50, label='Hallucinated', edgecolors='darkred')
+
+        plt.xlabel('Answer Length (Number of Words)', fontsize=12)
+        plt.ylabel('Average Similarity Score', fontsize=12)
+        plt.title('Answer Length vs Average Similarity Score\nBlue: Non-Hallucinated, Red: Hallucinated', fontsize=14)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+
+        # Add some statistics
+        if non_hallucinated:
+            non_hall_mean = np.mean([r['avg_similarity'] for r in non_hallucinated])
+            plt.axhline(y=non_hall_mean, color='blue', linestyle='--', alpha=0.7,
+                       label=f'Non-Hallucinated Mean: {non_hall_mean:.4f}')
+
+        if hallucinated:
+            hall_mean = np.mean([r['avg_similarity'] for r in hallucinated])
+            plt.axhline(y=hall_mean, color='red', linestyle='--', alpha=0.7,
+                       label=f'Hallucinated Mean: {hall_mean:.4f}')
+
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+        # Create POS-specific similarity analysis
+        self._create_pos_specific_similarity_plots(results)
+
+    def _create_pos_specific_similarity_plots(self, results):
+        # Create separate plots for each POS type showing similarity to all other words
+        pos_types = ['NOUN', 'VERB', 'ADJ', 'ADV', 'PROPN']
+
+        # Get x-axis range from the first plot for consistency
+        all_lengths = [r['answer_length'] for r in results]
+        x_min, x_max = min(all_lengths), max(all_lengths)
+
+        for pos_type in pos_types:
+            plt.figure(figsize=(12, 8))
+
+            # Collect data points for this POS type
+            hallucinated_lengths = []
+            hallucinated_sims = []
+            non_hallucinated_lengths = []
+            non_hallucinated_sims = []
+
+            for result in results:
+                word_embeddings = result['word_embeddings']
+                is_hallucinated = result['is_hallucinated']
+                answer_length = result['answer_length']
+
+                # Find words of the target POS type
+                target_words = [w for w in word_embeddings if w['pos'] == pos_type]
+
+                if target_words:
+                    # Calculate similarity between target POS words and all other words
+                    similarities = []
+                    for target_word in target_words:
+                        for other_word in word_embeddings:
+                            if target_word['text'] != other_word['text']:
+                                sim = self.cosine_similarity(target_word['vector'], other_word['vector'])
+                                similarities.append(sim)
+
+                    if similarities:
+                        avg_sim = np.mean(similarities)
+                        if is_hallucinated:
+                            hallucinated_lengths.append(answer_length)
+                            hallucinated_sims.append(avg_sim)
+                        else:
+                            non_hallucinated_lengths.append(answer_length)
+                            non_hallucinated_sims.append(avg_sim)
+
+            # Create scatter plot for this POS type using answer length as x-axis
+            if non_hallucinated_sims:
+                plt.scatter(non_hallucinated_lengths, non_hallucinated_sims,
+                           c='blue', alpha=0.6, s=50, label='Non-Hallucinated', edgecolors='darkblue')
+
+            if hallucinated_sims:
+                plt.scatter(hallucinated_lengths, hallucinated_sims,
+                           c='red', alpha=0.6, s=50, label='Hallucinated', edgecolors='darkred')
+
+            # Set x-axis to match the first plot
+            plt.xlabel('Answer Length (Number of Words)', fontsize=12)
+            plt.ylabel('Average Similarity Score', fontsize=12)
+            plt.title(f'{pos_type} Similarity to All Other Words\nBlue: Non-Hallucinated, Red: Hallucinated', fontsize=14)
+            plt.xlim(x_min - 1, x_max + 1)  # Add small margin
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+
+            # Add mean lines
+            if non_hallucinated_sims:
+                non_hall_mean = np.mean(non_hallucinated_sims)
+                plt.axhline(y=non_hall_mean, color='blue', linestyle='--', alpha=0.7,
+                           label=f'Non-Hall Mean: {non_hall_mean:.4f}')
+
+            if hallucinated_sims:
+                hall_mean = np.mean(hallucinated_sims)
+                plt.axhline(y=hall_mean, color='red', linestyle='--', alpha=0.7,
+                           label=f'Hall Mean: {hall_mean:.4f}')
+
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+    def _create_pos_hallucination_plot(self, results):
+        # Create bar plot showing POS combinations
+        plt.figure(figsize=(14, 8))
+
+        # Collect POS similarities for both hallucinated and non-hallucinated
+        pos_hallucinated = defaultdict(list)
+        pos_non_hallucinated = defaultdict(list)
+
+        for result in results:
+            word_embeddings = result['word_embeddings']
+            is_hallucinated = result['is_hallucinated']
+            n = len(word_embeddings)
+
+            # Calculate similarity matrix
+            similarity_matrix, _ = self._calculate_similarity_matrix(word_embeddings)
+
+            # Collect POS pair similarities
+            for i in range(n):
+                for j in range(i+1, n):
+                    pos1 = word_embeddings[i]['pos']
+                    pos2 = word_embeddings[j]['pos']
+
+                    # Create a standardized POS pair
+                    pos_pair = f"{min(pos1, pos2)}-{max(pos1, pos2)}"
+
+                    similarity_score = similarity_matrix[i, j]
+
+                    if is_hallucinated:
+                        pos_hallucinated[pos_pair].append(similarity_score)
+                    else:
+                        pos_non_hallucinated[pos_pair].append(similarity_score)
+
+        # Calculate averages
+        all_pos_pairs = set(pos_hallucinated.keys()) | set(pos_non_hallucinated.keys())
+
+        if not all_pos_pairs:
+            print("No POS combinations found")
+            return
+
+        pos_pairs = []
+        hallucinated_avgs = []
+        non_hallucinated_avgs = []
+
+        for pos_pair in sorted(all_pos_pairs):
+            pos_pairs.append(pos_pair)
+
+            hall_sims = pos_hallucinated.get(pos_pair, [])
+            non_hall_sims = pos_non_hallucinated.get(pos_pair, [])
+
+            hallucinated_avgs.append(np.mean(hall_sims) if hall_sims else 0)
+            non_hallucinated_avgs.append(np.mean(non_hall_sims) if non_hall_sims else 0)
+
+        # Calculate standard deviations
+        hallucinated_stds = []
+        non_hallucinated_stds = []
+
+        for pos_pair in sorted(all_pos_pairs):
+            hall_sims = pos_hallucinated.get(pos_pair, [])
+            non_hall_sims = pos_non_hallucinated.get(pos_pair, [])
+
+            hallucinated_stds.append(np.std(hall_sims) if hall_sims else 0)
+            non_hallucinated_stds.append(np.std(non_hall_sims) if non_hall_sims else 0)
+
+        # Create bar plot
+        x = np.arange(len(pos_pairs))
+        width = 0.35
+
+        bars1 = plt.bar(x - width/2, non_hallucinated_avgs, width,
+                       label='Non-Hallucinated', color='blue', alpha=0.4, edgecolor='darkblue',
+                       yerr=non_hallucinated_stds, capsize=5)
+        bars2 = plt.bar(x + width/2, hallucinated_avgs, width,
+                       label='Hallucinated', color='red', alpha=0.4, edgecolor='darkred',
+                       yerr=hallucinated_stds, capsize=5)
+
+        plt.xlabel('POS Combinations', fontsize=12)
+        plt.ylabel('Average Similarity Score', fontsize=12)
+        plt.title('Average Similarity by POS Combinations and Hallucination Status\n(with Standard Deviation Error Bars)', fontsize=14)
+        plt.xticks(x, pos_pairs, rotation=45, ha='right')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+
+        # Add value labels
+        for bars in [bars1, bars2]:
+            for bar in bars:
+                height = bar.get_height()
+                if height > 0:  # Add label if there's a value
+                    plt.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                            f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+
+        plt.tight_layout()
+        plt.show()
+
+# Simple testing function
+def test_visualizer():
+    analyzer = ContextualEmbeddingSimilarity('bert-base-uncased')
+
+    # Test with CSV dataset processing
+    # Hallucinated samples: 2561
+    # Non-hallucinated samples: 1525
+    dataset_path = './dataset/full_dataset.csv'
+
+    results = analyzer.process_dataset(dataset_path)
+    print(f"Total samples: {len(results)}")
+
+    # Print some basic statistics
+    hallucinated_count = sum(1 for r in results if r['is_hallucinated'])
+    non_hallucinated_count = len(results) - hallucinated_count
+
+    print(f"Hallucinated samples: {hallucinated_count}")
+    print(f"Non-hallucinated samples: {non_hallucinated_count}")
+
+    if results:
+        hall_avg_sim = np.mean([r['avg_similarity'] for r in results if r['is_hallucinated']])
+        non_hall_avg_sim = np.mean([r['avg_similarity'] for r in results if not r['is_hallucinated']])
+        print(f"Average similarity - Hallucinated: {hall_avg_sim:.4f}")
+        print(f"Average similarity - Non-hallucinated: {non_hall_avg_sim:.4f}")
+
+
+
+if __name__ == "__main__":
+    test_visualizer()
